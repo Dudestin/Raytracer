@@ -7,6 +7,8 @@
 #include "sphere.h"
 #include "hittable_list.h"
 #include <Eigen/Core>
+#include "camera.h"
+#include "random.h"
 
 using namespace Eigen;
 
@@ -26,6 +28,7 @@ int main()
 {
     int nx = 200;
     int ny = 100;
+    int ns = 100;
     std::cout << "P3" << std::endl << nx << " " << ny << std::endl << "255" << std::endl;
     Vector3d lower_left_corner(-2.0, -1.0, -1.0);
     Vector3d horizontal(4.0, 0.0, 0.0);
@@ -39,13 +42,17 @@ int main()
     list.push_back(std::move(p2));
 
     auto world(std::unique_ptr<hittable>(new hittable_list(std::move(list))));
+    camera cam;
     for (int j = ny - 1; j >= 0; --j) {
         for (int i = 0; i < nx; ++i) {
-            double u = double(i) / double(nx);
-            double v = double(j) / double(ny);
-            ray r(origin, lower_left_corner + u * horizontal + v * vertical);
-            
-            Vector3d col = color(r, world);
+            Vector3d col(0, 0, 0);
+            for (int s = 0; s < ns; s++) {
+                double u = double(i + random_double()) / double(nx);
+                double v = double(j + random_double()) / double(ny);
+                ray r = cam.get_ray(u, v);
+                col += color(r, world);
+            }
+            col /= double(ns);
 
             int ir = int(255.99 * col[0]);
             int ig = int(255.99 * col[1]);
