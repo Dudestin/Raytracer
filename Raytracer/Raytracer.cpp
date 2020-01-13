@@ -4,18 +4,29 @@
 #include <iostream>
 #include <vector>
 #include <memory>
+#include <Eigen/Core>
+#include <string>
 #include "sphere.h"
 #include "hittable_list.h"
-#include <Eigen/Core>
 #include "camera.h"
 #include "random.h"
+#include "material.h"
+#include "lambertian.h"
+#include "metal.h"
 
 using namespace Eigen;
 
-Vector3d color(const ray& r, std::unique_ptr<hittable>& world) {
+Vector3d color(const ray& r, std::unique_ptr<hittable>& world,int depth) {
     hit_record rec;
-    if (world->hit(r, 0.0,114514.0, rec)) {
-        return 0.5 * Vector3d(rec.normal.x() + 1, rec.normal.y() + 1, rec.normal.z() + 1);
+    if (world->hit(r, 0.0001,DBL_MAX, rec)) {
+        ray scattered;
+        Vector3d attenuation;
+        if (depth < 50 && rec.mat_ptr->scatter(r, rec, attenuation, scattered)) {
+            return attenuation.array() * color(scattered, world, depth + 1).array();
+        }
+        else {
+            return Vector3d(0, 0, 0);
+        }
     }
     else {
         auto unit_direction = r.direction().normalized();
@@ -35,11 +46,15 @@ int main()
     Vector3d vertical(0.0, 2.0, 0.0);
     Vector3d origin(0.0,0.0,0.0);
 
-    std::unique_ptr<hittable> p1(std::move(new sphere(Vector3d(0.0,0.0,-1.0),0.5)));
-    std::unique_ptr<hittable> p2(std::move(new sphere(Vector3d(0.0, -100.5, -1.0), 100.0)));
+    std::unique_ptr<hittable> p1(std::move(new sphere(Vector3d(0.0,0.0,-1.0),0.5,std::move(std::make_shared<lambertian>(Vector3d(0.8,0.3,0.3))))));
+    std::unique_ptr<hittable> p2(std::move(new sphere(Vector3d(0.0, -100.5, -1.0), 100.0,std::move(std::make_shared<lambertian>(Vector3d(0.8,0.8,0.8))))));
+    std::unique_ptr<hittable> p3(std::move(new sphere(Vector3d(1.0, 0.0, -1.0), 0.5, std::move(std::make_shared<metal>(Vector3d(0.8, 0.6, 0.2))))));
+    std::unique_ptr<hittable> p4(std::move(new sphere(Vector3d(-1.0, 0.0, -1.0), 0.5, std::move(std::make_shared<metal>(Vector3d(0.8, 0.8, 0.8))))));
     std::vector<std::unique_ptr<hittable>> list;
     list.push_back(std::move(p1));
     list.push_back(std::move(p2));
+    list.push_back(std::move(p3));
+    list.push_back(std::move(p4));
 
     auto world(std::unique_ptr<hittable>(new hittable_list(std::move(list))));
     camera cam;
@@ -50,25 +65,15 @@ int main()
                 double u = double(i + random_double()) / double(nx);
                 double v = double(j + random_double()) / double(ny);
                 ray r = cam.get_ray(u, v);
-                col += color(r, world);
+                col += color(r, world, 0);
             }
             col /= double(ns);
+            col = Vector3d(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
 
             int ir = int(255.99 * col[0]);
             int ig = int(255.99 * col[1]);
             int ib = int(255.99 * col[2]);
             std::cout << ir << " " << ig << " " << ib << std::endl;
         }
-    }
+    }    std::cout << sizeof(sphere) << std::endl;
 }
-
-// プログラムの実行: Ctrl + F5 または [デバッグ] > [デバッグなしで開始] メニュー
-// プログラムのデバッグ: F5 または [デバッグ] > [デバッグの開始] メニュー
-
-// 作業を開始するためのヒント: 
-//    1. ソリューション エクスプローラー ウィンドウを使用してファイルを追加/管理します 
-//   2. チーム エクスプローラー ウィンドウを使用してソース管理に接続します
-//   3. 出力ウィンドウを使用して、ビルド出力とその他のメッセージを表示します
-//   4. エラー一覧ウィンドウを使用してエラーを表示します
-//   5. [プロジェクト] > [新しい項目の追加] と移動して新しいコード ファイルを作成するか、[プロジェクト] > [既存の項目の追加] と移動して既存のコード ファイルをプロジェクトに追加します
-//   6. 後ほどこのプロジェクトを再び開く場合、[ファイル] > [開く] > [プロジェクト] と移動して .sln ファイルを選択します
